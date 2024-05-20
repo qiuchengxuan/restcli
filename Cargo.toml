@@ -1,0 +1,30 @@
+[package]
+name = "restcli"
+version = "0.1.0"
+edition = "2021"
+description = "RESTful API based CLI implementation and library"
+license = "MIT OR Apache-2.0"
+authors = ["qiuchengxuan <qiuchengxuan@gmail.com>"]
+repository = "https://github.com/qiuchengxuan/restcli"
+
+
+[dependencies]
+clap = { version = "4", features = ["derive"] }
+env_logger = "0.11"
+heapless = "0.8"
+jsonpath = { package = "jsonpath-rust", version = "0.6" }
+log = "0.4"
+serde = { version = "1.0", default-features = false, features = ["derive"] }
+serde_json = "1.0"
+serde_yaml = "0.9"
+termion = "4"
+urlencoding = "2"
+
+[dependencies.request]
+package = "reqwest"
+version = "0.12"
+default-features = false
+features = ["blocking", "json"]
+
+[lib]
+name = "restcli"

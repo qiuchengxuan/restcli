@@ -1,0 +1,16 @@
+/languages/rust:
+  GC: no
+/languages/rust/applications/restcli:
+  category: ultility
+/languages/go:
+  GC: yes
+/languages/go/applications/etcd:
+  category: database
+/languages/go/applications/kubernetes:
+  company: Google
+/languages/C%2FC++:
+  GC: no
+/languages/C%2FC++/applications/linux:
+  category: kernel
+/languages/C%2FC++/applications/ceph:
+  category: file-system

@@ -1,0 +1,19 @@
+/languages
+  .C/C++:
+    GC no
+    /applications
+      /ceph:
+        category file-system
+      /linux:
+        category kernel
+  /go:
+    GC yes
+    /applications
+      /etcd:
+        category database
+      /kubernetes:
+        company Google
+  /rust:
+    GC no
+    /applications/restcli:
+      category ultility
