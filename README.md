@@ -30,24 +30,24 @@ With some RESTful datas like this:
 restcli will convert those datas into the following notation:
 
 ```
-.languages
+/languages
   .C/C++:
     GC no
-    .applications
-      .ceph:
+    /applications
+      /ceph:
         category file-system
-      .linux:
+      /linux:
         category kernel
-  .go:
+  /go:
     GC yes
-    .applications
-      .etcd:
+    /applications
+      /etcd:
         category database
-      .kubernetes:
+      /kubernetes:
         company Google
-  .rust:
+  /rust:
     GC no
-    .applications.restcli:
+    /applications/restcli:
       category ultility
 ```
 

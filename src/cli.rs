@@ -1,3 +1,4 @@
+use std::cmp::Ordering;
 use std::io;
 use std::io::Write;
 
@@ -74,25 +75,61 @@ impl<'a> Querier<'a> {
 pub struct CLI {
     rest: Rest,
     apis: Vec<API>,
+    records: Vec<(String, Value)>,
+    prefix: String,
 }
 
 impl CLI {
-    pub fn new(url: String, apis: Vec<API>) -> Self {
+    pub fn new(url: String, apis: Vec<API>) -> request::Result<Self> {
         let mut headers = HeaderMap::new();
         headers.insert(ACCEPT, HeaderValue::from_static("application/json"));
         let rest = Rest { url, headers };
-        Self { rest, apis }
+        let records = Querier { rest: &rest, apis: &apis, results: Vec::new() }.query()?;
+        Ok(Self { rest, apis, records, prefix: "/".to_owned() })
     }
 
-    fn list(&self) -> request::Result<()> {
+    fn filter_records<'a>(&'a self) -> &'a [(String, Value)] {
+        if self.prefix == "/" {
+            return &self.records;
+        }
+        let start =
+            self.records.binary_search_by(|(key, _)| key.cmp(&self.prefix)).unwrap_or_else(|e| e);
+        let end = self.records[start..].binary_search_by(|(key, _)| {
+            if key.starts_with(&self.prefix) {
+                return Ordering::Less;
+            }
+            key.cmp(&self.prefix)
+        });
+        return &self.records[start..start + end.unwrap_or_else(|e| e)];
+    }
+
+    fn refresh(&mut self) -> request::Result<()> {
         let querier = Querier { rest: &self.rest, apis: &self.apis, results: Vec::new() };
-        println!("{}", Formatter(&querier.query()?));
+        self.records = querier.query()?;
         Ok(())
     }
 
-    pub fn run(&self) -> Result<(), String> {
+    fn change_directory(&mut self, arg: &str) -> bool {
+        let mut prefix = match () {
+            _ if arg.starts_with('/') => arg.to_owned(),
+            _ if self.prefix.ends_with('/') => self.prefix.clone() + arg,
+            _ => self.prefix.clone() + "/" + arg,
+        };
+        if let Some(index) = self.records.binary_search_by(|(key, _)| key.cmp(&prefix)).err() {
+            if !prefix.ends_with('/') {
+                prefix.push('/');
+            }
+            if index >= self.records.len() || !self.records[index].0.starts_with(&prefix) {
+                return false;
+            }
+        }
+        self.prefix = prefix;
+        true
+    }
+
+    pub fn run(&mut self) {
         let mut buf = Vec::new();
-        print!("restcli> ");
+        print!("restcli {}> ", self.prefix);
         io::stdout().flush().unwrap();
         for event in io::stdin().events() {
             let bytes = match event.unwrap() {
@@ -107,20 +144,29 @@ impl CLI {
                     buf.push(byte);
                     continue;
                 }
-                match std::str::from_utf8(buf.as_slice()).unwrap_or_default() {
-                    "list" => {
-                        if let Some(err) = self.list().err() {
+                let line = std::str::from_utf8(buf.as_slice()).unwrap_or_default();
+                let (command, arg) = line.split_once(' ').unwrap_or((line, ""));
+                match command {
+                    "cd" => {
+                        if !self.change_directory(arg) {
+                            println!("No such path");
+                        }
+                    }
+                    "refresh" => {
+                        if let Some(err) = self.refresh().err() {
                             eprintln!("Request backend failed: {}", err)
                         }
                     }
-                    "exit" => return Ok(()),
+                    "list" => {
+                        println!("{}", Formatter(self.filter_records()))
+                    }
+                    "exit" => return,
                     line => eprintln!("Unknown command {}", line),
                 }
                 buf.clear();
-                print!("restcli> ");
+                print!("restcli {}> ", self.prefix);
                 io::stdout().flush().unwrap();
             }
         }
-        Ok(())
     }
 }

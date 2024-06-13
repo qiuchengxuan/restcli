@@ -28,9 +28,13 @@ fn load_config(path: &str) -> Result<config::Config, String> {
 }
 
 fn run(config_path: &str) -> Result<(), String> {
-    let config =
-        load_config(config_path).map_err(|e| format!("Load config {} fail: {}", config_path, e))?;
-    cli::CLI::new(config.url, config.apis).run()
+    match load_config(config_path) {
+        Ok(config) => {
+            cli::CLI::new(config.url, config.apis).map_err(|e| format!("{}", e))?.run();
+            Ok(())
+        }
+        Err(error) => Err(format!("Load config {} fail: {}", config_path, error)),
+    }
 }
 
 fn main() {
