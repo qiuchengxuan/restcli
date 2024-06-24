@@ -66,13 +66,11 @@ impl<'a> Prefix<'a> {
             }
             let mut length = 1;
             for i in (num_match..ref_path.num_level()).rev() {
-                if ref_counts[i] == 1 {
-                    ref_path.pop(1);
-                } else if i == 0 || ref_counts[i] < ref_counts[i - 1] {
+                if i == 0 || ref_counts[i] > 1 && ref_counts[i] < ref_counts[i - 1] {
                     let start = index - ref_counts[i];
                     retval.push(Prefix { text: ref_path.pop(length), range: start..index });
                     length = 1;
-                } else if ref_counts[i] == ref_counts[i - 1] {
+                } else if ref_counts[i] > 1 && ref_counts[i] == ref_counts[i - 1] {
                     length += 1;
                 } else {
                     ref_path.pop(1);
@@ -112,6 +110,15 @@ mod test {
 
     #[test]
     fn test_build_prefix() {
+        let paths = vec!["/a", "/bc", "/def", "/g"];
+        let prefixes = Prefix::build(paths.into_iter());
+        let expected = [("/a", 0..1), ("/bc", 1..2), ("/def", 2..3), ("/g", 3..4)];
+        let expected: Vec<Prefix<'_>> = expected.iter().map(Into::into).collect();
+        assert_eq!(expected, prefixes);
+    }
+
+    #[test]
+    fn test_build_prefix_from_sample_data() {
         let test_data = include_str!("../test/sample-data.yaml");
         let data = match serde_yaml::from_str(test_data).unwrap() {
             serde_yaml::Value::Mapping(map) => map,

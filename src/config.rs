@@ -16,9 +16,10 @@ impl<'de> serde::Deserialize<'de> for JsonPath {
 #[derive(Deserialize)]
 pub struct API {
     pub path: String,
+    #[serde(rename = "entity")]
+    pub is_entity: Option<bool>,
     pub jsonpath: Option<JsonPath>,
-    #[serde(rename = "sub-apis")]
-    pub sub_apis: Option<Vec<API>>,
+    pub apis: Option<Vec<API>>,
 }
 
 #[derive(Deserialize)]
