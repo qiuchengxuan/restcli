@@ -1,5 +1,8 @@
 /languages/rust:
   GC: no
+  editions:
+    - 2018
+    - 2021
 /languages/rust/applications/restcli:
   category: ultility
 /languages/go:

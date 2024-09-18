@@ -15,5 +15,7 @@
         company Google
   /rust:
     GC no
+    edition 2018
+    edition 2021
     /applications/restcli:
       category ultility

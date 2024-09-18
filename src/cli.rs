@@ -68,7 +68,7 @@ impl<'a> Querier<'a> {
     }
 
     fn query(mut self) -> request::Result<(bool, String, Vec<(String, Value)>)> {
-        self.query_apis(self.apis, "/".into()).map(|_| Default::default())?;
+        self.query_apis(self.apis, "/".into())?;
         self.results.sort_by(|a, b| a.0.cmp(&b.0));
         Ok((self.more, self.root.unwrap_or("/".into()), self.results))
     }
@@ -178,7 +178,7 @@ impl CLI {
                 match command {
                     "cd" => self.change_directory(arg),
                     "list" => {
-                        println!("{}", Formatter::from(self.filter_records()))
+                        println!("{}", Formatter::new(self.filter_records(), |_| None))
                     }
                     "exit" => return,
                     line => eprintln!("Unknown command {}", line),

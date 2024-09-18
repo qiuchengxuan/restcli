@@ -21,22 +21,66 @@ impl<'a> Display for Wrapper<'a> {
     }
 }
 
+type KeywordsFn = fn(&str) -> Option<&str>;
+
 #[derive(Copy, Clone)]
 struct Context<'a> {
     indent_width: usize,
     yesno: [&'static str; 2],
+    keywords: KeywordsFn,
     key: &'a str,
     indent: usize,
 }
 
 impl Default for Context<'static> {
     fn default() -> Self {
-        Self { indent_width: 2, yesno: ["yes", "no"], indent: 0, key: "" }
+        Self { indent_width: 2, yesno: ["yes", "no"], keywords: |_| None, indent: 0, key: "" }
+    }
+}
+
+impl<'a> Context<'a> {
+    fn new(indent_width: usize, yesno: [&'static str; 2], keywords: KeywordsFn) -> Self {
+        Self { indent_width, yesno, keywords, ..Default::default() }
+    }
+}
+
+trait IsPrimitive {
+    fn is_primitive(&self) -> bool;
+}
+
+impl IsPrimitive for Value {
+    fn is_primitive(&self) -> bool {
+        match self {
+            Value::Array(_) | Value::Object(_) => false,
+            _ => true,
+        }
     }
 }
 
 trait Format {
     fn format<'a>(&self, f: &mut fmt::Formatter<'_>, ctx: Context<'a>) -> Result;
+}
+
+impl Format for Vec<Value> {
+    fn format<'a>(&self, f: &mut fmt::Formatter<'_>, ctx: Context<'a>) -> Result {
+        if self.len() == 0 {
+            return Ok(());
+        }
+        if self.as_slice().iter().all(|v| v.is_primitive()) {
+            let key = (ctx.keywords)(ctx.key).unwrap_or(ctx.key);
+            for item in self {
+                writeln!(f, "{:indent$}{} {}", "", key, Wrapper(item), indent = ctx.indent)?;
+            }
+            return Ok(());
+        }
+        writeln!(f, "{:indent$}{}", "", ctx.key, indent = ctx.indent)?;
+        let indent = ctx.indent + ctx.indent_width;
+        for item in self {
+            writeln!(f, "{:indent$}!", "", indent = indent)?;
+            writeln!(f, "{:indent$}{}", "", Wrapper(item), indent = indent)?;
+        }
+        writeln!(f, "{:indent$}!", "", indent = indent)
+    }
 }
 
 impl Format for Map<String, Value> {
@@ -54,12 +98,7 @@ impl Format for Map<String, Value> {
                 Value::String(string) => {
                     writeln!(f, "{:indent$}{} {}", "", key, string, indent = ctx.indent)?
                 }
-                Value::Array(array) => {
-                    let indent = ctx.indent;
-                    for item in array {
-                        writeln!(f, "{:indent$}{} {}", "", key, Wrapper(item), indent = indent)?;
-                    }
-                }
+                Value::Array(array) => array.format(f, Context { key, ..ctx })?,
                 Value::Object(map) => {
                     writeln!(f, "{:indent$}{}", "", key, indent = ctx.indent)?;
                     let ctx = Context { indent: ctx.indent + ctx.indent_width, key: "", ..ctx };
@@ -106,11 +145,12 @@ pub struct Formatter<'a, S: AsRef<str>> {
     records: &'a [(S, Value)],
     yesno: [&'static str; 2],
     indent_width: usize,
+    keywords: fn(&str) -> Option<&str>,
 }
 
-impl<'a, S: AsRef<str>> From<&'a [(S, Value)]> for Formatter<'a, S> {
-    fn from(records: &'a [(S, Value)]) -> Self {
-        Self { records, yesno: ["yes", "no"], indent_width: 2 }
+impl<'a, S: AsRef<str>> Formatter<'a, S> {
+    pub fn new(records: &'a [(S, Value)], keywords: KeywordsFn) -> Self {
+        Self { records, yesno: ["yes", "no"], indent_width: 2, keywords }
     }
 }
 
@@ -119,8 +159,7 @@ impl<'a, S: AsRef<str>> Display for Formatter<'a, S> {
         let prefixes = Prefix::build(self.records.iter().map(|(key, _)| key.as_ref()));
         let mut current = heapless::Vec::<&Prefix, MAX_LEVEL>::new();
         let mut index = 0;
-        let mut ctx =
-            Context { indent_width: self.indent_width, yesno: self.yesno, ..Default::default() };
+        let mut ctx = Context::new(self.indent_width, self.yesno, self.keywords);
         let mut prefix_len = 0;
         for (i, record) in self.records.iter().enumerate() {
             while i >= current.last().map(|p| p.range.end).unwrap_or(usize::MAX) {
@@ -153,6 +192,10 @@ impl<'a, S: AsRef<str>> Display for Formatter<'a, S> {
 
 #[cfg(test)]
 mod test {
+    fn keywords(word: &str) -> Option<&str> {
+        Some(word.trim_end_matches('s'))
+    }
+
     #[test]
     fn test_format() {
         let test_data = include_str!("../test/sample-data.yaml");
@@ -162,7 +205,7 @@ mod test {
         };
         let mut entries: Vec<(String, serde_json::Value)> = data.into_iter().collect();
         entries.sort_by(|a, b| a.0.cmp(&b.0));
-        let output = format!("{}", super::Formatter::from(entries.as_slice()));
+        let output = format!("{}", super::Formatter::new(entries.as_slice(), keywords));
         assert_eq!(include_str!("../test/sample-output.txt"), output);
     }
 }
